@@ -3,18 +3,57 @@
 
 import * as React from 'react'
 
-function Greeting({initialName = ''}) {
-  // 🐨 initialize the state to the value from localStorage
-  // 💰 window.localStorage.getItem('name') || initialName
-  const [name, setName] = React.useState(initialName)
+// Custom `useLocalStorageState` hook
+// Supports:
+//    - reading from and writing to the localStorage key provided
+//    - custom serializer and deserializer that can be passed into the options object
+//    - lazy default state initialization
+function useLocalStorageState(
+  key,
+  defaultState = '',
+  {serializer = JSON.stringify, deserializer = JSON.parse} = {},
+) {
+  const [state, setState] = React.useState(() => {
+    console.log('lazy initializer ran') // should only logged once, on the first render
 
-  // 🐨 Here's where you'll use `React.useEffect`.
-  // The callback should set the `name` in localStorage.
-  // 💰 window.localStorage.setItem('name', name)
+    // The default state can be an initializer function
+    const defaultStateValue =
+      typeof defaultState === 'function' ? defaultState() : defaultState
+
+    return deserializer(window.localStorage.getItem(key)) || defaultStateValue
+  })
+
+  React.useEffect(() => {
+    console.log('effect (writing to local storage) ran')
+    window.localStorage.setItem(key, serializer(state))
+  }, [key, state, serializer])
+
+  return [state, setState]
+}
+
+function Greeting({initialName = ''}) {
+  // const [name, setName] = React.useState(() => {
+  //   console.log('initialized') // should only logged once, on the first render
+  //   return window.localStorage.getItem('name') || initialName
+  // })
+
+  // React.useEffect(() => {
+  //   console.log('effect: writing to local storage')
+  //   window.localStorage.setItem('name', name)
+  // }, [name])
+
+  const [name, setName] = useLocalStorageState('name', initialName)
 
   function handleChange(event) {
-    setName(event.target.value)
+    setName(() => {
+      console.log('updating state')
+
+      return event.target.value
+    })
   }
+
+  console.log('returning react elements')
+
   return (
     <div>
       <form>
@@ -27,7 +66,14 @@ function Greeting({initialName = ''}) {
 }
 
 function App() {
-  return <Greeting />
+  return (
+    <Greeting
+      initialName={() => {
+        console.log('default state initializer ran')
+        return ''
+      }}
+    />
+  )
 }
 
 export default App
