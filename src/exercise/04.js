@@ -2,32 +2,24 @@
 // http://localhost:3000/isolated/exercise/04.js
 
 import * as React from 'react'
+import {useLocalStorageState} from '../utils'
 
-function Board() {
-  const [squares, setSquares] = React.useState(Array(9).fill(null))
-  const nextValue = calculateNextValue(squares)
-  const winner = calculateWinner(squares)
-  const status = calculateStatus(winner, squares, nextValue)
+function uuid(a, b) {
+  for (
+    b = a = '';
+    a++ < 36;
+    b +=
+      4 << (~a * 6.5)
+        ? (a ^ 15 ? 8 ^ (Math.random() * (a ^ 20 ? 16 : 4)) : 4).toString(16)
+        : '-'
+  );
+  return b
+}
 
-  function selectSquare(square) {
-    if (winner || squares[square]) {
-      return
-    }
-
-    const squaresCopy = [...squares]
-
-    squaresCopy[square] = nextValue
-
-    setSquares(squaresCopy)
-  }
-
-  function restart() {
-    setSquares(Array(9).fill(null))
-  }
-
+function Board({squares, onClick}) {
   function renderSquare(i) {
     return (
-      <button className="square" onClick={() => selectSquare(i)}>
+      <button className="square" onClick={() => onClick(i)}>
         {squares[i]}
       </button>
     )
@@ -35,7 +27,6 @@ function Board() {
 
   return (
     <div>
-      <div className="status">{status}</div>
       <div className="board-row">
         {renderSquare(0)}
         {renderSquare(1)}
@@ -51,18 +42,65 @@ function Board() {
         {renderSquare(7)}
         {renderSquare(8)}
       </div>
-      <button className="restart" onClick={restart}>
-        restart
-      </button>
     </div>
   )
 }
 
 function Game() {
+  const [history, setHistory] = useLocalStorageState('history', [
+    Array(9).fill(null),
+  ])
+  const [currentStep, setCurrentStep] = useLocalStorageState('currentStep', 0)
+
+  const currentSquares = history[currentStep]
+
+  const nextValue = calculateNextValue(currentSquares)
+  const winner = calculateWinner(currentSquares)
+  const status = calculateStatus(winner, currentSquares, nextValue)
+
+  function renderMove(i, key) {
+    return (
+      <li key={key}>
+        <button className="move" onClick={() => setCurrentStep(i)}>
+          <span>Go to {i === 0 ? 'game start' : `move #${i}`}</span>
+          <span>{i === currentStep ? ' (current)' : ''}</span>
+        </button>
+      </li>
+    )
+  }
+
+  function selectSquare(square) {
+    if (winner || currentSquares[square]) {
+      return
+    }
+
+    const currentSquaresCopy = [...currentSquares]
+
+    currentSquaresCopy[square] = nextValue
+
+    setHistory(prevHistory => [
+      ...prevHistory.slice(0, currentStep + 1),
+      currentSquaresCopy,
+    ])
+    setCurrentStep(prevCurrentStep => prevCurrentStep + 1)
+  }
+
+  function restart() {
+    setHistory([Array(9).fill(null)])
+    setCurrentStep(0)
+  }
+
   return (
     <div className="game">
       <div className="game-board">
-        <Board />
+        <Board onClick={selectSquare} squares={currentSquares} />
+        <button className="restart" onClick={restart}>
+          restart
+        </button>
+      </div>
+      <div className="game-info">
+        <div>{status}</div>
+        <ol>{history.map((_, i) => renderMove(i, uuid()))}</ol>
       </div>
     </div>
   )
